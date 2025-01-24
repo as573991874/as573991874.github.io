@@ -1,1 +1,992 @@
-Hello World
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>蛇来了玩蛇～</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        canvas {
+            border: 2px solid #333;
+            background-color: black;
+            max-width: 95vw;
+            max-height: 80vh;
+            width: auto;
+            height: auto;
+        }
+
+        #score {
+            color: #333;
+            font-size: 24px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .start-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .start-content h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .start-content p {
+            margin: 10px 0;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .start-button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .start-button:hover {
+            background: #45a049;
+        }
+
+        #winScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .win-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 80%;
+            animation: popIn 0.5s ease-out;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0.3);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .win-content h1 {
+            color: #ff4444;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .restart-button {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .restart-button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="startScreen">
+        <div class="start-content">
+            <h1>🐍 蛇年接福气 🧨</h1>
+            <p>新春目标：咱要接到30福气！</p>
+            <p>操作方式：</p>
+            <p>↑ 向上接福</p>
+            <p>↓ 向下接福</p>
+            <p>← 向左接福</p>
+            <p>→ 向右接福</p>
+            <button class="start-button">开始接福</button>
+        </div>
+    </div>
+
+    <div id="winScreen">
+        <div class="win-content">
+            <h1>🎊 恭喜发财 福气满满！🎊</h1>
+            <p>新春喜事：已达30福气！</p>
+            <button class="restart-button">好运连绵</button>
+        </div>
+    </div>
+
+    <div id="score">当前福气值: 1 福气</div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        // 设置canvas大小
+        function resizeCanvas() {
+            const maxWidth = window.innerWidth * 0.95;
+            const maxHeight = window.innerHeight * 0.8;
+            const aspectRatio = 4 / 3;  // 保持4:3的比例
+
+            let width = maxWidth;
+            let height = width / aspectRatio;
+
+            if (height > maxHeight) {
+                height = maxHeight;
+                width = height * aspectRatio;
+            }
+
+            canvas.width = Math.floor(width);
+            canvas.height = Math.floor(height);
+            gridSize = Math.floor(width / 40);  // 调整网格大小
+            gridWidth = Math.floor(canvas.width / gridSize);
+            gridHeight = Math.floor(canvas.height / gridSize);
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        let gridSize, gridWidth, gridHeight;
+        resizeCanvas();
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            resetGame();
+        });
+
+        // 删除这三行重复声明的代码
+        // const gridSize = 20;
+        // const gridWidth = canvas.width / gridSize;
+        // const gridHeight = canvas.height / gridSize;
+
+        // 添加统一的分数更新函数
+        function updateScore() {
+            scoreElement.textContent = `当前福气值: ${snake.body.length} 福气`;
+        }
+
+        let snake = {
+            body: [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 },
+                { x: 8, y: 10 }
+            ],
+            direction: { x: 1, y: 0 }
+        };
+
+        let score = 3;  // 初始分数为 3
+        updateScore();  // 现在可以安全调用了
+
+        function randomPosition() {
+            return {
+                x: Math.floor(Math.random() * gridWidth),
+                y: Math.floor(Math.random() * gridHeight)
+            };
+        }
+
+        let lastUpdate = 0;
+        const BASE_MOVE_INTERVAL = 80; // 提高基础速度（原来是100）
+        const MIN_SPEED_MULTIPLIER = 0.7; // 调整最小速度倍数（原来是0.6）
+        const MAX_SPEED_MULTIPLIER = 1.4; // 调整最大速度倍数（原来是1.2）
+        let animationProgress = 1; // 动画进度
+
+        let lastDirection = { x: 1, y: 0 };  // 添加这行来记录上一次的方向
+
+        let turnPoint = null;  // 添加转弯点记录
+
+        // 添加眨眼动画计时器
+        let blinkTimer = 0;
+        let isBlinking = false;
+
+        // 修改胜利动画相关变量
+        let isWinning = false;
+        let winStartTime = 0;
+        const WIN_DELAY = 3000; // 3秒后显示胜利界面
+
+        function drawSnake() {
+            if (!snake.body || !snake.body.length) return;
+
+            // 修改胜利动画逻辑
+            if (isWinning) {
+                if (winStartTime === 0) {
+                    winStartTime = Date.now();
+                }
+
+                // 检查是否到达显示胜利界面的时间
+                if (Date.now() - winStartTime >= WIN_DELAY) {
+                    document.getElementById('winScreen').style.display = 'flex';
+                    return;
+                }
+            }
+
+            // 先绘制所有蛇身
+            snake.body.forEach((segment, index) => {
+                if (!segment) return;
+
+                let x = segment.x;
+                let y = segment.y;
+
+                // 修改胜利动画波动效果
+                if (isWinning) {
+                    const wavePhase = Date.now() * 0.005;
+                    const offset = Math.sin(wavePhase + index * 0.3) * gridSize * 0.3;
+                    y += offset;
+                }
+
+                if (animationProgress < 1) {
+                    if (index === 0) {  // 蛇头
+                        // 简化蛇头移动逻辑
+                        const prevX = (x - snake.direction.x + gridWidth) % gridWidth;
+                        const prevY = (y - snake.direction.y + gridHeight) % gridHeight;
+                        x = prevX + snake.direction.x * animationProgress;
+                        y = prevY + snake.direction.y * animationProgress;
+                    } else {  // 蛇身
+                        const prevSegment = snake.body[index - 1];
+                        if (prevSegment) {
+                            let dx = prevSegment.x - x;
+                            let dy = prevSegment.y - y;
+
+                            // 改进跨边界处理
+                            if (Math.abs(dx) > gridWidth / 2) {
+                                dx = dx > 0 ? dx - gridWidth : dx + gridWidth;
+                            }
+                            if (Math.abs(dy) > gridHeight / 2) {
+                                dy = dy > 0 ? dy - gridHeight : dy + gridHeight;
+                            }
+
+                            x = x + dx * animationProgress;
+                            y = y + dy * animationProgress;
+
+                            // 处理边界环绕
+                            if (x < 0) x += gridWidth;
+                            if (x >= gridWidth) x -= gridWidth;
+                            if (y < 0) y += gridHeight;
+                            if (y >= gridHeight) y -= gridHeight;
+                        }
+                    }
+                }
+
+                // 绘制蛇身
+                // 绘制蛇身，使用红色和金色相间的花纹
+                const isEven = index % 2 === 0;
+                ctx.fillStyle = isEven ? '#ff3333' : '#ffd700';  // 红色和金色相间
+                ctx.fillRect(Math.floor(x * gridSize), Math.floor(y * gridSize), gridSize - 2, gridSize - 2);
+
+                // 添加春节花纹
+                if (index === 0) {  // 在蛇头上添加福字
+                    ctx.fillStyle = '#fff';
+                    ctx.font = `bold ${gridSize * 0.7}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('福', Math.floor(x * gridSize + gridSize / 2), Math.floor(y * gridSize + gridSize / 2));
+                }
+                
+            });
+
+            // 最后单独绘制蛇头的眼睛
+            const head = snake.body[0];
+            if (head) {
+                let x = head.x;
+                let y = head.y;
+
+                // 添加胜利动画时的波动效果到眼睛位置
+                if (isWinning) {
+                    const wavePhase = Date.now() * 0.005;
+                    const offset = Math.sin(wavePhase) * gridSize * 0.3;
+                    y += offset;
+                }
+
+                if (animationProgress < 1) {
+                    const prevX = (x - snake.direction.x + gridWidth) % gridWidth;
+                    const prevY = (y - snake.direction.y + gridHeight) % gridHeight;
+                    x = prevX + snake.direction.x * animationProgress;
+                    y = prevY + snake.direction.y * animationProgress;
+                }
+
+                const baseEyeRadius = Math.max(1.5, gridSize / 12);  // 减小基础眼睛尺寸
+                // 计算眨眼动画的眼睛大小
+                blinkTimer = (blinkTimer + 1) % 120;  // 每120帧一个完整循环
+                const blinkPhase = Math.abs(Math.sin(blinkTimer / 120 * Math.PI * 2));
+                const eyeHeight = baseEyeRadius * (0.1 + 0.9 * blinkPhase);  // 垂直方向缩放
+
+                const currentX = Math.floor(x * gridSize);
+                const currentY = Math.floor(y * gridSize);
+
+                ctx.fillStyle = '#000000';
+                if (snake.direction.x === 1) { // 向右
+                    ctx.beginPath();
+                    ctx.ellipse(currentX + gridSize * 0.6, currentY + gridSize * 0.25, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.ellipse(currentX + gridSize * 0.6, currentY + gridSize * 0.55, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (snake.direction.x === -1) { // 向左
+                    ctx.beginPath();
+                    ctx.ellipse(currentX + gridSize * 0.3, currentY + gridSize * 0.25, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.ellipse(currentX + gridSize * 0.3, currentY + gridSize * 0.55, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (snake.direction.y === -1) { // 向上
+                    ctx.beginPath();
+                    ctx.ellipse(currentX + gridSize * 0.3, currentY + gridSize * 0.25, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.ellipse(currentX + gridSize * 0.6, currentY + gridSize * 0.25, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                } else { // 向下
+                    ctx.beginPath();
+                    ctx.ellipse(currentX + gridSize * 0.3, currentY + gridSize * 0.55, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.ellipse(currentX + gridSize * 0.6, currentY + gridSize * 0.55, baseEyeRadius, eyeHeight, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        let pendingDirection = null; // 添加待转向变量
+
+        // 添加一些鼓励语
+        const encouragements = [
+            "福气东来！",
+            "恭喜发财！",
+            "大吉大利！",
+            "财运亨通！",
+            "福运绵绵！",
+            "新春大吉！",
+            "万事如意！",
+            "步步高升！",
+            "吉祥如意！",
+            "福气冲天！"
+        ];
+
+        // 修改 moveSnake 函数中的碰撞检查部分
+        function moveSnake() {
+            const head = snake.body[0];
+
+            // 检查是否可以转向（只在完全到达格子时）
+            if (pendingDirection &&
+                animationProgress >= 1) {  // 确保完全移动到格子
+                snake.direction = pendingDirection;
+                lastDirection = { ...snake.direction };
+                pendingDirection = null;
+            }
+
+            const newHead = {
+                x: (head.x + snake.direction.x + gridWidth) % gridWidth,
+                y: (head.y + snake.direction.y + gridHeight) % gridHeight
+            };
+
+            // 先将新头部添加到身体数组的开头
+            snake.body.unshift(newHead);
+
+            // 检查是否吃到食物
+            if (newHead.x === food.x && newHead.y === food.y) {
+                const growth = foodTypes[food.type].growth;
+                score += growth;
+                updateScore();
+
+                // 根据食物类型显示不同消息
+                if (food.type === 'blue') {
+                    showMessage('双倍福气！');
+                } else if (food.type === 'gold') {
+                    showMessage('三倍福气！');
+                } else {
+                    const message = encouragements[Math.floor(Math.random() * encouragements.length)];
+                    showMessage(message);
+                }
+
+                if (score >= 30) {
+                    isWinning = true;
+                    food = { x: -1, y: -1 };
+                    return;  // 直接返回，保持当前长度
+                }
+                food = randomPosition();
+                // 吃到食物时不删除尾部，这样蛇身就会增长
+            } else {
+                snake.body.pop();  // 只有在没吃到食物时才删除尾部
+            }
+
+            // 检查碰撞
+            // 修改自身碰撞检查
+            for (let i = 1; i < snake.body.length; i++) {
+                if (newHead.x === snake.body[i].x && newHead.y === snake.body[i].y) {
+                    // 保留碰撞位置之前的部分
+                    showMessage("撞到自己了！福气减少" + (snake.body.length - i) + "福气");
+                    snake.body = snake.body.slice(0, i);
+                    score = snake.body.length;
+                    updateScore();
+                    break;
+                }
+            }
+        }
+
+        // 添加食物类型配置（移到全局）
+        const foodTypes = {
+            normal: { color: '#ff0000', growth: 1 },
+            blue: { color: '#0066ff', growth: 2, chance: 0.2 },  // 蓝色小药丸，增长2厘米
+            gold: { color: '#ffd700', growth: 3, chance: 0.1 }   // 金色营养品，增长3厘米
+        };
+
+        // 定义全局的 food 变量
+        let food = {
+            x: 15,
+            y: 15,
+            type: 'normal'
+        };
+
+        // 修改 randomPosition 函数
+        function randomPosition() {
+            const rand = Math.random();
+            let foodType = 'normal';
+            if (rand < foodTypes.gold.chance) {
+                foodType = 'gold';
+            } else if (rand < foodTypes.blue.chance + foodTypes.gold.chance) {
+                foodType = 'blue';
+            }
+
+            return {
+                x: Math.floor(Math.random() * gridWidth),
+                y: Math.floor(Math.random() * gridHeight),
+                type: foodType
+            };
+        }
+
+        // 修改 drawFood 函数
+        function drawFood() {
+            if (food.x < 0 || food.y < 0 || isWinning) return;
+
+            const x = food.x * gridSize;
+            const y = food.y * gridSize;
+
+            if (food.type === 'gold') {
+                // 绘制招财猫
+                ctx.fillStyle = '#FFD700';
+                // 身体
+                ctx.fillRect(x + gridSize / 4, y + gridSize / 3, gridSize / 2, gridSize / 2);
+                // 耳朵
+                ctx.beginPath();
+                ctx.moveTo(x + gridSize / 4, y + gridSize / 3);
+                ctx.lineTo(x + gridSize / 2, y + gridSize / 6);
+                ctx.lineTo(x + gridSize * 3 / 4, y + gridSize / 3);
+                ctx.fill();
+                // 举起的爪子
+                ctx.fillRect(x + gridSize / 3, y + gridSize / 6, gridSize / 6, gridSize / 3);
+            } else if (food.type === 'blue') {
+                // 绘制福袋
+                ctx.fillStyle = '#CD2E3A';
+                ctx.beginPath();
+                ctx.arc(x + gridSize / 2, y + gridSize / 2, gridSize / 3, 0, Math.PI * 2);
+                ctx.fill();
+                // 绘制"福"字
+                ctx.fillStyle = '#FFD700';
+                ctx.font = `bold ${gridSize / 2}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('福', x + gridSize / 2, y + gridSize / 2);
+            } else {
+                // 绘制橘子
+                ctx.fillStyle = '#FF8C00';
+                ctx.beginPath();
+                ctx.arc(x + gridSize / 2, y + gridSize / 2, gridSize / 3, 0, Math.PI * 2);
+                ctx.fill();
+                // 绘制叶子
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.ellipse(x + gridSize / 2, y + gridSize / 4,
+                    gridSize / 6, gridSize / 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 添加消息提示函数
+        function showMessage(text) {
+            const msg = document.createElement('div');
+            msg.style.position = 'fixed';
+            msg.style.left = '50%';
+            msg.style.top = '40%';
+            msg.style.transform = 'translate(-50%, -50%)';
+            msg.style.color = '#ff0';
+            msg.style.fontSize = '24px';
+            msg.style.fontWeight = 'bold';
+            msg.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+            msg.textContent = text;
+            document.body.appendChild(msg);
+
+            // 动画效果
+            msg.animate([
+                { opacity: 1, transform: 'translate(-50%, -50%) scale(1.5)' },
+                { opacity: 0, transform: 'translate(-50%, -150%) scale(1)' }
+            ], {
+                duration: 1000,
+                easing: 'ease-out'
+            }).onfinish = () => msg.remove();
+        }
+        function resetGame() {
+            snake.body = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];  // 重置时也是三个格子
+            snake.direction = { x: 1, y: 0 };
+            snake.length = 3;
+            lastDirection = { x: 1, y: 0 };
+            pendingDirection = null;
+            score = 3;
+            updateScore();
+            food = randomPosition();
+        }
+
+        // 初始化分数显示
+        score = 3;  // 修改初始分数为 3
+        updateScore();
+
+        const startScreen = document.getElementById('startScreen');
+        let gameStarted = false;
+
+        // 添加开始游戏的事件监听
+        startScreen.querySelector('.start-button').addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            gameStarted = true;
+            resetGame();
+            lastUpdate = 0;  // 重置时间戳
+            requestAnimationFrame(gameLoop);
+        });
+
+        // 添加重新开始游戏的事件监听
+        document.querySelector('.restart-button').addEventListener('click', () => {
+            document.getElementById('winScreen').style.display = 'none';
+            isWinning = false;
+            winStartTime = 0;
+            resetGame();
+            gameStarted = true;
+            lastUpdate = 0;
+            requestAnimationFrame(gameLoop);
+        });
+
+        // 添加炸弹数组定义
+        let bombs = [];  // 添加这行代码
+
+        // 添加炸弹人配置
+        const bomber = {
+            x: Math.floor(gridWidth / 2),  // 修改为画面中间的x坐标
+            y: Math.floor(gridHeight / 2),  // 修改为画面中间的y坐标
+            direction: { x: 1, y: 0 },
+            moveInterval: 400,
+            lastMove: 0,
+            bombInterval: 2000 + Math.random() * 3000,
+            lastBomb: 0,
+            directionChangeInterval: 7000 + Math.random() * 8000,
+            lastDirectionChange: 0,
+            possibleDirections: [
+                { x: 1, y: 0 },
+                { x: -1, y: 0 },
+                { x: 0, y: 1 },
+                { x: 0, y: -1 }
+            ],
+            path: [
+                { x: 1, y: 0 },
+                { x: 1, y: 0 },
+                { x: 1, y: 0 },
+                { x: 1, y: 0 },
+                { x: 1, y: 0 },
+                { x: 0, y: 1 },
+                { x: -1, y: 0 },
+                { x: -1, y: 0 },
+                { x: -1, y: 0 },
+                { x: -1, y: 0 },
+                { x: -1, y: 0 },
+                { x: 0, y: 1 }
+            ],
+            pathIndex: 0
+        };
+
+        // 修改 updateBomber 函数中的方向切换逻辑
+        // 修改炸弹人配置为数组
+        const bombers = [
+            {
+                x: Math.floor(gridWidth / 3),    // 第一个炸弹人在左侧
+                y: Math.floor(gridHeight / 2),
+                direction: { x: 1, y: 0 },
+                moveInterval: 400,
+                lastMove: 0,
+                bombInterval: 2000 + Math.random() * 3000,
+                lastBomb: 0,
+                directionChangeInterval: 7000 + Math.random() * 8000,
+                lastDirectionChange: 0,
+                possibleDirections: [
+                    { x: 1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: 0, y: 1 },
+                    { x: 0, y: -1 }
+                ],
+                path: [
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 0, y: 1 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: 0, y: 1 }
+                ],
+                pathIndex: 0
+            },
+            {
+                x: Math.floor(gridWidth * 2 / 3),  // 第二个炸弹人在右侧
+                y: Math.floor(gridHeight / 2),
+                direction: { x: -1, y: 0 },        // 初始方向相反
+                moveInterval: 400,
+                lastMove: 0,
+                bombInterval: 2000 + Math.random() * 3000,
+                lastBomb: 0,
+                directionChangeInterval: 7000 + Math.random() * 8000,
+                lastDirectionChange: 0,
+                possibleDirections: [
+                    { x: 1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: 0, y: 1 },
+                    { x: 0, y: -1 }
+                ],
+                path: [
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 1, y: 0 },
+                    { x: 0, y: 1 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: -1, y: 0 },
+                    { x: 0, y: 1 }
+                ],
+                pathIndex: 0
+            }
+        ];
+
+        // 修改 updateBomber 函数
+        function updateBomber(timestamp) {
+            // 更新所有炸弹人
+            for (const bomber of bombers) {
+                // 移动炸弹人
+                if (timestamp - bomber.lastMove >= bomber.moveInterval) {
+                    bomber.lastMove = timestamp;
+                    bomber.x = (bomber.x + bomber.direction.x + gridWidth) % gridWidth;
+                    bomber.y = (bomber.y + bomber.direction.y + gridHeight) % gridHeight;
+                }
+
+                // 随机切换方向
+                if (timestamp - bomber.lastDirectionChange >= bomber.directionChangeInterval) {
+                    bomber.lastDirectionChange = timestamp;
+                    bomber.direction = bomber.possibleDirections[
+                        Math.floor(Math.random() * bomber.possibleDirections.length)
+                    ];
+                    bomber.directionChangeInterval = 7000 + Math.random() * 8000;
+                }
+
+                // 放置炸弹
+                if (timestamp - bomber.lastBomb >= bomber.bombInterval) {
+                    bomber.lastBomb = timestamp;
+                    bomber.bombInterval = 2000 + Math.random() * 3000;
+
+                    bombs.push({
+                        x: bomber.x,
+                        y: bomber.y,
+                        plantTime: timestamp,
+                        exploded: false
+                    });
+                }
+            }
+
+            // 更新炸弹状态
+            for (let i = bombs.length - 1; i >= 0; i--) {
+                const bomb = bombs[i];
+                if (!bomb.exploded && timestamp - bomb.plantTime >= 2000) {
+                    // 炸弹爆炸
+                    bomb.exploded = true;
+                    bomb.explosionStart = timestamp;
+
+                    // 修改炸弹伤害逻辑
+                    const explosionRange = 3;
+                    let hitIndex = -1;
+
+                    // 检查每个身体段是否在爆炸范围内（从第二节身体开始检查）
+                    for (let j = 1; j < snake.body.length; j++) {
+                        const segment = snake.body[j];
+                        if ((segment.y === bomb.y && Math.abs(segment.x - bomb.x) <= explosionRange) ||
+                            (segment.x === bomb.x && Math.abs(segment.y - bomb.y) <= explosionRange)) {
+                            hitIndex = j;
+                            break;
+                        }
+                    }
+
+                    // 如果蛇被炸到（不是蛇头），截断受伤位置之后的部分
+                    if (hitIndex !== -1) {
+                        const lostLength = snake.body.length - hitIndex;
+                        snake.body = snake.body.slice(0, hitIndex);
+                        score = snake.body.length;
+                        updateScore();
+                        showMessage("哎呀！福气减少了" + lostLength + "福气");
+                    }
+                }
+            }
+        }
+
+        // 修改 drawBomber 函数
+        function drawBomber() {
+            // 绘制所有炸弹人
+            for (const bomber of bombers) {
+                const x = Math.floor(bomber.x * gridSize);
+                const y = Math.floor(bomber.y * gridSize);
+
+                // 绘制身体
+                ctx.fillStyle = '#ff6b6b';  // 淡红色身体
+                ctx.fillRect(x, y, gridSize - 2, gridSize - 2);
+
+                // 绘制眼睛
+                ctx.fillStyle = '#000';
+                const eyeSize = gridSize / 8;
+                ctx.fillRect(x + gridSize / 4 - eyeSize / 2, y + gridSize / 3, eyeSize, eyeSize);
+                ctx.fillRect(x + gridSize * 3 / 4 - eyeSize / 2, y + gridSize / 3, eyeSize, eyeSize);
+
+                // 绘制生气的眉毛
+                ctx.beginPath();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.moveTo(x + gridSize / 4 - eyeSize, y + gridSize / 4);
+                ctx.lineTo(x + gridSize / 4 + eyeSize, y + gridSize / 3);
+                ctx.moveTo(x + gridSize * 3 / 4 - eyeSize, y + gridSize / 3);
+                ctx.lineTo(x + gridSize * 3 / 4 + eyeSize, y + gridSize / 4);
+                ctx.stroke();
+            }
+        }
+
+        // 修改 drawBombs 函数中的爆炸效果绘制
+        function drawBombs(timestamp) {
+            for (const bomb of bombs) {
+                const x = Math.floor(bomb.x * gridSize);
+                const y = Math.floor(bomb.y * gridSize);
+
+                if (bomb.exploded) {
+                    // 计算爆炸动画进度（2秒内完成）
+                    const progress = Math.min((timestamp - bomb.explosionStart) / 350, 1);
+                    const size = progress * 3; // 爆炸范围从0增长到2
+
+                    // 修改透明度变化：0->1->0
+                    const alpha = progress <= 0.5
+                        ? progress * 2  // 前半段：0到1
+                        : 2 * (1 - progress);  // 后半段：1到0
+
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+
+                    // 绘制扩散的十字形
+                    ctx.fillStyle = `rgba(255, 100, 0, ${alpha})`;
+
+                    // 水平爆炸线
+                    for (let i = -size; i <= size; i++) {
+                        const posX = x + i * gridSize;
+                        const scale = 1 - Math.abs(i) / (size + 1);
+                        ctx.fillRect(posX, y, gridSize - 2, gridSize - 2);
+                        ctx.fillStyle = `rgba(255, 100, 0, ${alpha * scale})`;
+                    }
+
+                    // 垂直爆炸线
+                    for (let i = -size; i <= size; i++) {
+                        const posY = y + i * gridSize;
+                        const scale = 1 - Math.abs(i) / (size + 1);
+                        ctx.fillRect(x, posY, gridSize - 2, gridSize - 2);
+                        ctx.fillStyle = `rgba(255, 100, 0, ${alpha * scale})`;
+                    }
+
+                    // 爆炸中心光晕
+                    const gradient = ctx.createRadialGradient(
+                        x + gridSize / 2, y + gridSize / 2, 0,
+                        x + gridSize / 2, y + gridSize / 2, gridSize * 2 * size
+                    );
+                    gradient.addColorStop(0, `rgba(255, 200, 0, ${alpha})`);
+                    gradient.addColorStop(0.3, `rgba(255, 100, 0, ${alpha * 0.7})`);
+                    gradient.addColorStop(0.7, `rgba(255, 50, 0, ${alpha * 0.3})`);
+                    gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - gridSize * 2 * size, y - gridSize * 2 * size,
+                        gridSize * 5 * size, gridSize * 5 * size);
+
+                    // 添加爆炸火花效果
+                    const sparkCount = 8;
+                    const sparkRadius = gridSize * size;
+                    ctx.fillStyle = `rgba(255, 200, 0, ${alpha * 0.7})`;
+                    for (let i = 0; i < sparkCount; i++) {
+                        const angle = (i / sparkCount) * Math.PI * 2 + progress * Math.PI;
+                        const sparkX = x + gridSize / 2 + Math.cos(angle) * sparkRadius;
+                        const sparkY = y + gridSize / 2 + Math.sin(angle) * sparkRadius;
+                        ctx.beginPath();
+                        ctx.arc(sparkX, sparkY, gridSize / 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.restore();
+
+                    // 如果爆炸动画完成，移除炸弹
+                    if (progress >= 1 && alpha <= 0.1) {
+                        bombs.splice(bombs.indexOf(bomb), 1);
+                    }
+                } else {
+                    // 未爆炸炸弹的绘制
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(x + gridSize / 4, y, gridSize / 2, gridSize - 2);
+
+                    // 绘制鞭炮引线
+                    ctx.strokeStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.moveTo(x + gridSize / 2, y);
+                    ctx.lineTo(x + gridSize / 2, y - gridSize / 2);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // 修改 gameLoop 函数
+        function gameLoop(timestamp) {
+            if (!gameStarted) return;
+
+            if (!lastUpdate) lastUpdate = timestamp;
+
+            // 增强背景动画效果
+            const time = Date.now() * 0.001;
+            const hue1 = (Math.sin(time * 0.3) * 30 + 220) % 360;  // 增加色相变化范围
+            const hue2 = (Math.sin(time * 0.5) * 30 + 240) % 360;  // 增加色相变化范围
+            const saturation1 = 80 + Math.sin(time * 0.7) * 20;     // 添加饱和度变化
+            const saturation2 = 80 + Math.sin(time * 0.9) * 20;     // 添加饱和度变化
+            const brightness1 = 15 + Math.sin(time * 0.4) * 5;      // 添加亮度变化
+            const brightness2 = 10 + Math.sin(time * 0.6) * 5;      // 添加亮度变化
+
+            // 创建多层渐变背景
+            const gradient1 = ctx.createRadialGradient(
+                canvas.width * 0.5, canvas.height * 0.5, 0,
+                canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.7
+            );
+            gradient1.addColorStop(0, `hsl(${hue1}, ${saturation1}%, ${brightness1}%)`);
+            gradient1.addColorStop(1, `hsl(${hue2}, ${saturation2}%, ${brightness2}%)`);
+
+            // 添加脉动效果
+            const pulseSize = (Math.sin(time * 2) * 0.1 + 0.9) * canvas.width * 0.7;
+            const gradient2 = ctx.createRadialGradient(
+                canvas.width * 0.5, canvas.height * 0.5, 0,
+                canvas.width * 0.5, canvas.height * 0.5, pulseSize
+            );
+            gradient2.addColorStop(0, `hsla(${(hue1 + 30) % 360}, 70%, 20%, 0.3)`);
+            gradient2.addColorStop(1, `hsla(${(hue2 + 30) % 360}, 70%, 15%, 0)`);
+
+            // 填充主背景
+            ctx.fillStyle = gradient1;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 添加脉动层
+            ctx.fillStyle = gradient2;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 更新游戏状态
+            const speedProgress = score / 30;
+            const speedMultiplier = MIN_SPEED_MULTIPLIER +
+                (MAX_SPEED_MULTIPLIER - MIN_SPEED_MULTIPLIER) * speedProgress;
+            const currentMoveInterval = BASE_MOVE_INTERVAL / speedMultiplier;
+
+            const elapsed = timestamp - lastUpdate;
+            animationProgress = Math.min(1, elapsed / currentMoveInterval);
+
+            if (elapsed >= currentMoveInterval && !isWinning) {
+                moveSnake();
+                lastUpdate = timestamp;
+                animationProgress = 0;
+            }
+
+            // 按正确的顺序绘制游戏元素
+            drawFood();         // 先画食物
+            drawSnake();        // 再画蛇
+            updateBomber(timestamp);  // 更新炸弹人状态
+            drawBombs(timestamp);        // 画炸弹和爆炸效果
+            drawBomber();       // 最后画炸弹人
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 初始化游戏
+        resetGame();
+        requestAnimationFrame(gameLoop);
+
+        // 保留这一个事件监听器，删除其他重复的
+        document.addEventListener('keydown', (event) => {
+            switch (event.key.toLowerCase()) {  // 转换为小写以支持大小写
+                case 'arrowup':
+                case 'w':
+                    if (snake.direction.y !== 1) {
+                        lastDirection = { ...snake.direction };
+                        snake.direction = { x: 0, y: -1 };
+                    }
+                    break;
+                case 'arrowdown':
+                case 's':
+                    if (snake.direction.y !== -1) {
+                        lastDirection = { ...snake.direction };
+                        snake.direction = { x: 0, y: 1 };
+                    }
+                    break;
+                case 'arrowleft':
+                case 'a':
+                    if (snake.direction.x !== 1) {
+                        lastDirection = { ...snake.direction };
+                        snake.direction = { x: -1, y: 0 };
+                    }
+                    break;
+                case 'arrowright':
+                case 'd':
+                    if (snake.direction.x !== -1) {
+                        lastDirection = { ...snake.direction };
+                        snake.direction = { x: 1, y: 0 };
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+
+</html>
